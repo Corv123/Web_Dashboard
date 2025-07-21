@@ -1,0 +1,664 @@
+import React, { useState } from 'react';
+import { BarChart, Bar, XAxis, YAxis, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { Home, Users, Heart, TrendingUp, Target, Clock, DollarSign, Activity, MapPin, Calendar } from 'lucide-react';
+
+const Dashboard = () => {
+  const [currentView, setCurrentView] = useState(0);
+
+  // Sample data for charts
+  const merchantLocationData = [
+    { name: 'Location 1', value: 4500 },
+    { name: 'Location 2', value: 3500 },
+    { name: 'Location 3', value: 2800 },
+    { name: 'Location 4', value: 1200 },
+    { name: 'Location 5', value: 800 }
+  ];
+
+  const donorTrendData = [
+    { name: 'Donor 1', value: 650 },
+    { name: 'Donor 2', value: 620 },
+    { name: 'Donor 3', value: 580 },
+    { name: 'Donor 4', value: 480 },
+    { name: 'Donor 5', value: 350 }
+  ];
+
+  const pieData = [
+    { name: 'Male', value: 65, color: '#6366F1' },
+    { name: 'Female', value: 35, color: '#EC4899' }
+  ];
+
+  const donationsOverTimeData = [
+    { day: 'Sun', amount: 120 },
+    { day: 'Mon', amount: 150 },
+    { day: 'Tue', amount: 110 },
+    { day: 'Wed', amount: 140 },
+    { day: 'Thu', amount: 80 },
+    { day: 'Fri', amount: 60 },
+    { day: 'Sat', amount: 40 }
+  ];
+
+  const donationsByCauseData = [
+    { name: 'Education', value: 3500 },
+    { name: 'Healthcare', value: 3200 },
+    { name: 'Environment', value: 2400 },
+    { name: 'Poverty', value: 1400 },
+    { name: 'Animal Welfare', value: 800 }
+  ];
+
+  const topCharityDonationsData = [
+    { name: 'Charity A', value: 5500 },
+    { name: 'Charity B', value: 3500 },
+    { name: 'Charity C', value: 2000 },
+    { name: 'Charity D', value: 1000 },
+    { name: 'Charity E', value: 700 }
+  ];
+
+  const salesVolumeData = [
+    { time: '9:00', value: 800 },
+    { time: '10:00', value: 1200 },
+    { time: '11:00', value: 900 },
+    { time: '12:00', value: 3500 },
+    { time: '13:00', value: 3200 },
+    { time: '14:00', value: 2800 },
+    { time: '15:00', value: 600 },
+    { time: '16:00', value: 800 },
+    { time: '17:00', value: 1000 },
+    { time: '18:00', value: 900 }
+  ];
+
+  const topLocationSalesData = [
+    { name: 'Location 1', value: 3500 },
+    { name: 'Location 2', value: 3000 },
+    { name: 'Location 3', value: 2000 },
+    { name: 'Location 4', value: 1000 },
+    { name: 'Location 5', value: 600 }
+  ];
+
+  const dineInTakeawayData = [
+    { time: '9:00', dineIn: 300, takeaway: 500 },
+    { time: '10:00', dineIn: 400, takeaway: 800 },
+    { time: '11:00', dineIn: 300, takeaway: 600 },
+    { time: '12:00', dineIn: 1500, takeaway: 2000 },
+    { time: '13:00', dineIn: 1200, takeaway: 2000 },
+    { time: '14:00', dineIn: 1000, takeaway: 1800 },
+    { time: '15:00', dineIn: 200, takeaway: 400 },
+    { time: '16:00', dineIn: 300, takeaway: 500 },
+    { time: '17:00', dineIn: 400, takeaway: 600 },
+    { time: '18:00', dineIn: 300, takeaway: 600 }
+  ];
+
+  const ordersOverTimeData = [
+    { day: 'Sun', orders: 120 },
+    { day: 'Mon', orders: 150 },
+    { day: 'Tue', orders: 110 },
+    { day: 'Wed', orders: 140 },
+    { day: 'Thu', orders: 80 },
+    { day: 'Fri', orders: 60 },
+    { day: 'Sat', orders: 40 }
+  ];
+
+  const dsgdEarningMethodsData = [
+    { name: 'Round-Up', value: 65, color: '#6366F1' },
+    { name: 'Forfeit Discount', value: 35, color: '#EC4899' }
+  ];
+
+  const topMerchantsByDonationData = [
+    { name: 'Merchant A', value: 5500 },
+    { name: 'Merchant B', value: 3500 },
+    { name: 'Merchant C', value: 2000 },
+    { name: 'Merchant D', value: 1000 },
+    { name: 'Merchant E', value: 700 }
+  ];
+
+  const donationTypeData = [
+    { name: 'Direct', value: 65, color: '#6366F1' },
+    { name: 'Split', value: 35, color: '#EC4899' }
+  ];
+
+  const donationByLocationData = [
+    { name: 'Location A', value: 3500 },
+    { name: 'Location B', value: 3200 },
+    { name: 'Location C', value: 2400 },
+    { name: 'Location D', value: 1400 },
+    { name: 'Location E', value: 800 }
+  ];
+
+  // Enhanced Stat Card Component
+  const StatCard = ({ title, value, subtitle, trend, icon: Icon, bgGradient, iconColor }) => (
+    <div className={`relative overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 ${bgGradient}`} style={{ minHeight: '160px' }}>
+      <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
+      <div className="relative p-6">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-white/80 text-sm font-medium mb-2">{title}</p>
+            <p className="text-3xl font-bold text-white mb-1">{value}</p>
+            <p className={`text-sm ${trend && trend.startsWith('+') ? 'text-green-200' : trend && trend.startsWith('-') ? 'text-red-200' : 'text-white/70'}`}>
+              {trend || subtitle}
+            </p>
+          </div>
+          <div className={`p-3 rounded-xl ${iconColor} bg-white/20 backdrop-blur-sm`}>
+            <Icon size={24} className="text-white" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Enhanced Chart Container
+  const ChartCard = ({ title, children, className = "" }) => (
+    <div className={`bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 ${className}`} style={{ minHeight: '300px' }}>
+      <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+        <div className="w-1 h-6 bg-gradient-to-b from-indigo-500 to-purple-500 rounded-full"></div>
+        {title}
+      </h3>
+      <div style={{ width: '100%', height: '100%' }}>
+        {children}
+      </div>
+    </div>
+  );
+
+  // View 1: Home Dashboard
+  const HomeView = () => (
+    <div className="p-8 bg-gradient-to-br from-slate-50 Homeo-50 min-h-screen">
+      {/* Header */}
+      <div className="mb-8 flex items-center justify-between">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+            <span className="text-xl font-semibold text-gray-800">Dashboard Overview</span>
+          </div>
+          <select className="px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+            <option>Weekly</option>
+            <option>Monthly</option>
+            <option>Yearly</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-4 gap-6 mb-8">
+        <StatCard
+          title="Total Donations"
+          value="$23,450"
+          trend="+12.5% from last week"
+          icon={DollarSign}
+          bgGradient="bg-gradient-to-br from-emerald-500 to-blue-600"
+          iconColor="text-emerald-400"
+        />
+        <StatCard
+          title="Total Donors"
+          value="1,234"
+          trend="-0.5% from last week"
+          icon={Users}
+          bgGradient="bg-gradient-to-br from-blue-500 to-purple-600"
+          iconColor="text-blue-400"
+        />
+        <StatCard
+          title="Merchants"
+          value="10"
+          subtitle="SIT Foodgle Hub"
+          icon={MapPin}
+          bgGradient="bg-gradient-to-br from-purple-500 to-red-500"
+          iconColor="text-purple-400"
+        />
+        <StatCard
+          title="Charities"
+          value="12"
+          subtitle="All Active"
+          icon={Heart}
+          bgGradient="bg-gradient-to-br from-red-500 to-orange-500"
+          iconColor="text-red-400"
+        />
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-2 gap-6 mb-8">
+        <ChartCard title="Donations Over Time">
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={donationsOverTimeData}>
+              <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                  border: 'none', 
+                  borderRadius: '12px', 
+                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
+                }} 
+              />
+              <Line 
+                type="monotone" 
+                dataKey="amount" 
+                stroke="#6366f1" 
+                strokeWidth={3} 
+                dot={{ fill: '#6366f1', strokeWidth: 2, r: 6 }}
+                activeDot={{ r: 8, stroke: '#6366f1', strokeWidth: 2 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="Donations by Cause">
+          <div style={{ width: '100%', height: '300px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={donationsByCauseData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <XAxis type="number" tick={{ fontSize: 12 }} />
+                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                    border: 'none', 
+                    borderRadius: '12px', 
+                    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
+                  }} 
+                />
+                <Bar dataKey="value" fill="url(#gradient2)" radius={[0, 8, 8, 0]} />
+                <defs>
+                  <linearGradient id="gradient2" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#F59E0B" />
+                    <stop offset="100%" stopColor="#EF4444" />
+                  </linearGradient>
+                </defs>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+      </div>
+
+      {/* Charts Row 2 */}
+      <div className="grid grid-cols-2 gap-6 mb-8">
+        <ChartCard title="Top Donations by Charity">
+          <div style={{ width: '100%', height: '300px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={topCharityDonationsData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <XAxis type="number" tick={{ fontSize: 12 }} />
+                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                    border: 'none', 
+                    borderRadius: '12px', 
+                    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
+                  }} 
+                />
+                <Bar dataKey="value" fill="url(#gradient3)" radius={[0, 8, 8, 0]} />
+                <defs>
+                  <linearGradient id="gradient3" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#8B5CF6" />
+                    <stop offset="100%" stopColor="#EC4899" />
+                  </linearGradient>
+                </defs>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+
+        <ChartCard title="Donor Gender Distribution">
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={pieData}
+                cx="50%"
+                cy="50%"
+                outerRadius={120}
+                innerRadius={60}
+                dataKey="value"
+                label={({ name, value }) => `${name}: ${value}%`}
+                labelLine={false}
+              >
+                {pieData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                  border: 'none', 
+                  borderRadius: '12px', 
+                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
+                }} 
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
+    </div>
+  );
+
+  // View 2: Donations Dashboard
+  const DonationsView = () => (
+    <div className="p-8 bg-gradient-to-br from-slate-50 via-purple-50 to-pink-50 min-h-screen">
+      {/* Filters */}
+      <div className="mb-8 flex gap-4">
+        <select className="px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+          <option>Last 7 days</option>
+          <option>Last 30 days</option>
+          <option>Last 90 days</option>
+        </select>
+        <select className="px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+          <option>All Charities</option>
+          <option>Education</option>
+          <option>Healthcare</option>
+        </select>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-3 gap-6 mb-8">
+        <StatCard
+          title="Total Donations"
+          value="$24,500"
+          trend="+12.5% from last month"
+          icon={DollarSign}
+          bgGradient="bg-gradient-to-br from-green-500 to-emerald-600"
+          iconColor="text-green-400"
+        />
+        <StatCard
+          title="Total Donors"
+          value="1,234"
+          trend="-1.5% from last week"
+          icon={Users}
+          bgGradient="bg-gradient-to-br from-blue-500 to-cyan-600"
+          iconColor="text-blue-400"
+        />
+        <StatCard
+          title="Active Charities"
+          value="12"
+          subtitle="All active"
+          icon={Heart}
+          bgGradient="bg-gradient-to-br from-pink-500 to-rose-600"
+          iconColor="text-pink-400"
+        />
+      </div>
+
+      {/* Charts Row 1 */}
+      <div className="grid grid-cols-2 gap-6 mb-8">
+        <ChartCard title="Top Merchants by Donation Amount">
+          <div style={{ width: '100%', height: '300px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={topMerchantsByDonationData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <XAxis type="number" tick={{ fontSize: 12 }} />
+                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                    border: 'none', 
+                    borderRadius: '12px', 
+                    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
+                  }} 
+                />
+                <Bar dataKey="value" fill="url(#gradient3)" radius={[0, 8, 8, 0]} />
+                <defs>
+                  <linearGradient id="gradient3" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#8B5CF6" />
+                    <stop offset="100%" stopColor="#EC4899" />
+                  </linearGradient>
+                </defs>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+
+        <ChartCard title="Direct vs Split Donations">
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={donationTypeData}
+                cx="50%"
+                cy="50%"
+                outerRadius={120}
+                innerRadius={60}
+                dataKey="value"
+                label={({ name, value }) => `${name}: ${value}%`}
+                labelLine={false}
+              >
+                {donationTypeData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                  border: 'none', 
+                  borderRadius: '12px', 
+                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
+                }} 
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
+
+      {/* Share of Donations by Location */}
+      <ChartCard title="Share of Donations by Location">
+        <div style={{ width: '100%', height: '300px' }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={donationByLocationData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <XAxis type="number" tick={{ fontSize: 12 }} />
+              <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                  border: 'none', 
+                  borderRadius: '12px', 
+                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
+                }} 
+              />
+              <Bar dataKey="value" fill="url(#gradient4)" radius={[0, 8, 8, 0]} />
+              <defs>
+                <linearGradient id="gradient4" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#F59E0B" />
+                  <stop offset="100%" stopColor="#EF4444" />
+                </linearGradient>
+              </defs>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </ChartCard>
+    </div>
+  );
+
+  // View 3: Merchants/Sales Dashboard
+  const MerchantsView = () => (
+    <div className="p-8 bg-gradient-to-br from-slate-50 via-orange-50 to-amber-50 min-h-screen">
+      {/* Filters */}
+      <div className="mb-8 flex gap-4">
+        <select className="px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow focus:ring-2 focus:ring-orange-500 focus:border-transparent flex items-center gap-2">
+          <option>Weekly</option>
+          <option>Monthly</option>
+          <option>Yearly</option>
+        </select>
+        <select className="px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow focus:ring-2 focus:ring-orange-500 focus:border-transparent">
+          <option>All Locations</option>
+          <option>Location 1</option>
+          <option>Location 2</option>
+        </select>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-6 mb-8">
+        <StatCard
+          title="Total Transactions"
+          value="2,345"
+          trend="+12.5% from yesterday"
+          icon={TrendingUp}
+          bgGradient="bg-gradient-to-br from-red-500 to-yellow-500"
+          iconColor="text-orange-400"
+        />
+        <StatCard
+          title="Peak Transaction Hours"
+          value="12pm - 1pm"
+          icon={Activity}
+          bgGradient="bg-gradient-to-br from-purple-500 to-blue-600"
+          iconColor="text-amber-400"
+        />
+      </div>
+
+      {/* Charts Row 1 */}
+      <div className="grid grid-cols-2 gap-6 mb-8">
+        <ChartCard title="Dine-in vs Takeaway Trend">
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={dineInTakeawayData}>
+              <XAxis dataKey="time" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                  border: 'none', 
+                  borderRadius: '12px', 
+                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
+                }} 
+              />
+              <Line 
+                type="monotone" 
+                dataKey="dineIn" 
+                name="Dine-in"
+                stroke="#F59E0B" 
+                strokeWidth={3}
+                dot={{ fill: '#F59E0B', strokeWidth: 2, r: 6 }}
+                activeDot={{ r: 8, stroke: '#F59E0B', strokeWidth: 2 }}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="takeaway" 
+                name="Takeaway"
+                stroke="#EF4444" 
+                strokeWidth={3}
+                dot={{ fill: '#EF4444', strokeWidth: 2, r: 6 }}
+                activeDot={{ r: 8, stroke: '#EF4444', strokeWidth: 2 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="Orders Over Time">
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={ordersOverTimeData}>
+              <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                  border: 'none', 
+                  borderRadius: '12px', 
+                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
+                }} 
+              />
+              <Line 
+                type="monotone" 
+                dataKey="orders" 
+                stroke="#EF4444" 
+                strokeWidth={3}
+                dot={{ fill: '#EF4444', strokeWidth: 2, r: 6 }}
+                activeDot={{ r: 8, stroke: '#EF4444', strokeWidth: 2 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
+
+      {/* DSGD Earning Methods Chart */}
+      <ChartCard title="DSGD Earning Methods: Round-Up vs. Forfeit Discounts">
+        <ResponsiveContainer width="100%" height={250}>
+          <PieChart>
+            <Pie
+              data={dsgdEarningMethodsData}
+              cx="50%"
+              cy="50%"
+              outerRadius={100}
+              innerRadius={50}
+              dataKey="value"
+              label={({ name, value }) => `${name}: ${value}%`}
+            >
+              {dsgdEarningMethodsData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip 
+              contentStyle={{ 
+                backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                border: 'none', 
+                borderRadius: '12px', 
+                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
+              }} 
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </ChartCard>
+    </div>
+  );
+
+  const views = [HomeView, DonationsView, MerchantsView];
+  const viewNames = ['Home Dashboard', 'Donations Dashboard', 'Merchants Dashboard'];
+  const viewIcons = [Home, Heart, Users];
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+
+      <div className="flex">
+        {/* Enhanced Sidebar */}
+        <div className="w-64 bg-white shadow-xl border-r border-gray-100">
+          <div className="p-6">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <span className="text-white font-bold text-lg">D</span>
+              </div>
+              <div>
+                <h2 className="font-bold text-gray-800">DSGD</h2>
+                <p className="text-xs text-gray-500">Dashboard</p>
+              </div>
+            </div>
+            
+            <nav className="space-y-2">
+              {[
+                { index: 0, icon: Home, label: 'Home', color: 'text-emerald-600' },
+                { index: 2, icon: Users, label: 'Merchants', color: 'text-orange-600' },
+                { index: 1, icon: Heart, label: 'Charities', color: 'text-pink-600' }
+              ].map(({ index, icon: Icon, label, color }) => (
+                <button
+                  key={index}
+                  className={`w-full flex items-center gap-4 p-3 rounded-xl transition-all duration-200 group ${
+                    currentView === index 
+                      ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 shadow-sm' 
+                      : 'hover:bg-gray-50'
+                  }`}
+                  onClick={() => setCurrentView(index)}
+                >
+                  <Icon 
+                    size={20} 
+                    className={`${currentView === index ? color : 'text-gray-500'} group-hover:scale-110 transition-transform`} 
+                  />
+                  <span className={`font-medium ${currentView === index ? 'text-gray-800' : 'text-gray-600'}`}>
+                    {label}
+                  </span>
+                  {currentView === index && (
+                    <div className="ml-auto w-2 h-2 bg-indigo-500 rounded-full"></div>
+                  )}
+                </button>
+              ))}
+            </nav>
+          </div>
+        </div>
+
+        {/* Enhanced Main Content */}
+        <div className="flex-1">
+          <div className="bg-white border-b border-gray-200 p-6 shadow-sm">
+            <div className="flex items-center gap-4">
+              {React.createElement(viewIcons[currentView], { 
+                size: 28, 
+                className: currentView === 0 ? 'text-emerald-600' : currentView === 1 ? 'text-pink-600' : 'text-orange-600'
+              })}
+              <h1 className="text-2xl font-bold text-gray-800">{viewNames[currentView]}</h1>
+              <div className="ml-auto flex items-center gap-2 text-sm text-gray-500">
+                <Calendar size={16} />
+                <span>{new Date().toLocaleDateString()}</span>
+              </div>
+            </div>
+          </div>
+          {React.createElement(views[currentView])}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;  
