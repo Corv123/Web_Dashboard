@@ -3,7 +3,7 @@ import { TrendingUp, Activity, Calendar, MapPin } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import StatCard from '../components/StatCard';
 import ChartCard from '../components/ChartCard';
-import { getAllOrders, getAllUsers } from '../../../services/api';
+import { getAllOrders, getAllUsers } from '../processors/getProcessor.js';
 import dayjs from 'dayjs';
 
 const MerchantsView = () => {

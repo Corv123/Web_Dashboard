@@ -1,5 +1,3 @@
-import React from 'react';
-
 const ChartCard = ({ title, children, className = "" }) => (
   <div className={`bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 border border-gray-100 ${className}`} style={{ minHeight: '300px' }}>
     <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">

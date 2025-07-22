@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DollarSign, Users, MapPin, Heart, Calendar } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import StatCard from '../components/StatCard';
 import ChartCard from '../components/ChartCard';
-import { getAllDonations, getAllOrders, getAllUsers } from '../../../services/api';
+import { getAllDonations, getAllOrders, getAllUsers } from '../processors/getProcessor.js';
 import dayjs from 'dayjs';
+import { chartConfig, timeFormats, ChartGradients, ChartControlsSelector} from '../processors/chartProcessor.js'
 
 const HomeView = () => {
   const [donations, setDonations] = useState([]);
@@ -12,76 +13,33 @@ const HomeView = () => {
   const [users, setUsers] = useState([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  
+  // New dynamic states
+  const [screenSize, setScreenSize] = useState('medium');
+  const [timeGrouping, setTimeGrouping] = useState('day');
+  const [topMerchantsLimit, setTopMerchantsLimit] = useState(5);
 
+  // Responsive chart height hook
   useEffect(() => {
-    console.log('=== STARTING API CALLS ===');
+    /* Resizer */ 
+    const handleResize = () => {
+      if (window.innerWidth < 768) setScreenSize('small');
+      else if (window.innerWidth < 1024) setScreenSize('medium');
+      else setScreenSize('large');
+    };
     
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    
+    /* getProcessor */
     getAllDonations()
       .then(res => {
-        console.log('RAW donations API response:', res);
-        console.log('Response type:', typeof res);
-        console.log('Is array?', Array.isArray(res));
-        
-        // Check all possible response structures
-        if (res) {
-          console.log('Response keys:', Object.keys(res));
-          if (res.result) {
-            console.log('res.result:', res.result);
-            console.log('res.result keys:', Object.keys(res.result));
-            if (res.result.data) {
-              console.log('res.result.data:', res.result.data);
-              console.log('res.result.data is array?', Array.isArray(res.result.data));
-            }
-          }
-          if (res.data) {
-            console.log('res.data:', res.data);
-            console.log('res.data is array?', Array.isArray(res.data));
-          }
-        }
-        
         const data = Array.isArray(res)
           ? res
           : (res.result && Array.isArray(res.result.data) ? res.result.data : []);
-        
-        console.log('PROCESSED donations data:', data);
-        console.log('PROCESSED data length:', data.length);
-        
         setDonations(data);
-        
-        // Enhanced debugging for donation structure
-        if (data.length > 0) {
-          console.log('Sample donation structure:', data[0]);
-          console.log('Available donation fields:', Object.keys(data[0]));
-          console.log('donation_amt value:', data[0].donation_amt);
-          console.log('donation_amt type:', typeof data[0].donation_amt);
-          
-          // Check for different possible field names
-          const possibleAmountFields = ['donation_amt', 'amount', 'donation_amount', 'value'];
-          possibleAmountFields.forEach(field => {
-            if (data[0][field] !== undefined) {
-              console.log(`Found ${field}:`, data[0][field], typeof data[0][field]);
-            }
-          });
-          
-          // Log all donations to see the actual values
-          console.log('All donations with amounts:', data.map(d => ({
-            id: d._id || d.id,
-            donation_amt: d.donation_amt,
-            amount: d.amount,
-            donation_amount: d.donation_amount
-          })));
-        } else {
-          console.warn('⚠️ NO DONATIONS FOUND - possible issues:');
-          console.warn('1. API endpoint might be wrong');
-          console.warn('2. Database might be empty');
-          console.warn('3. Response structure might be different');
-          console.warn('4. API might be returning an error');
-        }
       })
       .catch(error => {
-        console.error('❌ DONATIONS API ERROR:', error);
-        console.error('Error details:', error.message);
-        console.error('Error stack:', error.stack);
         setDonations([]);
       });
     
@@ -90,7 +48,6 @@ const HomeView = () => {
         ? res
         : (res.result && Array.isArray(res.result.data) ? res.result.data : []);
       setOrders(data);
-      console.log('orders response:', data);
     });
     
     getAllUsers().then(res => {
@@ -98,9 +55,11 @@ const HomeView = () => {
         ? res
         : (res.result && Array.isArray(res.result.data) ? res.result.data : []);
       setUsers(data);
-      console.log('users response:', data);
     });
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  const getChartHeight = () => chartConfig.chartHeights[screenSize];
 
   // Defensive: Only reduce if array
   const donationsArr = Array.isArray(donations) ? donations : [];
@@ -169,18 +128,58 @@ const HomeView = () => {
     return true;
   });
 
-  // Orders Over Time (Line Chart)
-  const ordersOverTimeData = filteredOrders.reduce((acc, order) => {
-    if (!order.order_complete_datetime) return acc;
-    const day = dayjs(order.order_complete_datetime).format('ddd');
-    const found = acc.find(item => item.day === day);
-    if (found) {
-      found.amount += Number(order.order_cost);
-    } else {
-      acc.push({ day, amount: Number(order.order_cost) });
+    // UPDATED: Current Week Daily Orders (Line Chart) - GMT+8 timezone
+  const ordersOverTimeData = (() => {
+    // Get current date in GMT+8
+    const now = new Date();
+    const gmt8Now = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+    
+    // For this specific case, if today is 23rd, we want 17-23
+    // So we go back 6 days from today to get the start (17th)
+    const weekStart = new Date(gmt8Now.getTime() - (6 * 24 * 60 * 60 * 1000));
+    weekStart.setHours(0, 0, 0, 0);
+    
+    // Generate 7 days starting from weekStart
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const dayDate = new Date(weekStart.getTime() + (i * 24 * 60 * 60 * 1000));
+      const dayNumber = dayDate.getDate();
+      
+      days.push({
+        period: dayNumber.toString(),
+        date: dayDate,
+        amount: 0,
+        count: 0
+      });
     }
-    return acc;
-  }, []);
+    
+    // Group orders by day
+    filteredOrders.forEach(order => {
+      if (!order.order_complete_datetime) return;
+      
+      // Convert order date to GMT+8
+      const orderDate = new Date(order.order_complete_datetime);
+      const orderGmt8 = new Date(orderDate.getTime() + (8 * 60 * 60 * 1000));
+      
+      // Find which day this order belongs to
+      const dayIndex = days.findIndex(day => {
+        const dayStart = new Date(day.date);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(day.date);
+        dayEnd.setHours(23, 59, 59, 999);
+        
+        return orderGmt8 >= dayStart && orderGmt8 <= dayEnd;
+      });
+      
+      if (dayIndex !== -1) {
+        days[dayIndex].amount += Number(order.order_cost) || 0;
+        days[dayIndex].count += 1;
+      }
+    });
+    
+    return days;
+  })();
+
 
   // Orders by Merchant (Bar Chart)
   const ordersByMerchantData = filteredOrders.reduce((acc, order) => {
@@ -193,87 +192,95 @@ const HomeView = () => {
     return acc;
   }, []);
 
-  // Top Merchants by Sales (Bar Chart)
+  // UPDATED: Dynamic Top Merchants by Sales (Bar Chart)
   const topMerchantsData = Array.isArray(ordersByMerchantData)
-    ? [...ordersByMerchantData].sort((a, b) => b.value - a.value).slice(0, 5)
+    ? [...ordersByMerchantData]
+        .sort((a, b) => b.value - a.value)
+        .slice(0, topMerchantsLimit === -1 ? ordersByMerchantData.length : topMerchantsLimit)
     : [];
 
-  // User Gender Distribution (Pie Chart)
-  const maleCount = usersArr.filter(u => u.user_gender === 'Male').length;
-  const femaleCount = usersArr.filter(u => u.user_gender === 'Female').length;
-  const otherCount = usersArr.filter(u => u.user_gender && u.user_gender !== 'Male' && u.user_gender !== 'Female').length;
-  
-  const pieData = [
-    { name: 'Male', value: maleCount, color: '#6366F1' },
-    { name: 'Female', value: femaleCount, color: '#EC4899' },
-    ...(otherCount > 0 ? [{ name: 'Other', value: otherCount, color: '#10B981' }] : [])
-  ].filter(item => item.value > 0);
+  // UPDATED: Dynamic User Gender Distribution (Pie Chart)
+  const genderTypes = ['Male', 'Female', 'Other', 'Prefer not to say', 'Non-binary'];
+  const genderCounts = genderTypes.reduce((acc, gender) => {
+    const count = usersArr.filter(u => u.user_gender === gender).length;
+    if (count > 0) {
+      acc.push({
+        name: gender,
+        value: count,
+        color: chartConfig.pieColors[acc.length] || chartConfig.pieColors[0]
+      });
+    }
+    return acc;
+  }, []);
 
-  // Calculate donation trend based on donation_datetime with enhanced field checking
-  const calculateDonationTrend = () => {
-    if (donationsArr.length === 0) return "+0%";
-    
-    const now = new Date();
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-    
-    const thisWeekDonations = donationsArr.filter(donation => {
-      const donationDate = new Date(donation.donation_datetime || donation.created_at || donation.createdAt);
-      return donationDate >= oneWeekAgo && donationDate <= now;
+  // Handle any remaining gender types not in the predefined list
+  const handledGenders = genderTypes;
+  const otherGenders = usersArr.filter(u => 
+    u.user_gender && !handledGenders.includes(u.user_gender)
+  );
+
+  if (otherGenders.length > 0) {
+    const otherTypes = [...new Set(otherGenders.map(u => u.user_gender))];
+    otherTypes.forEach((gender, index) => {
+      const count = usersArr.filter(u => u.user_gender === gender).length;
+      genderCounts.push({
+        name: gender,
+        value: count,
+        color: chartConfig.pieColors[(genderCounts.length + index) % chartConfig.pieColors.length]
+      });
     });
-    
-    const lastWeekDonations = donationsArr.filter(donation => {
-      const donationDate = new Date(donation.donation_datetime || donation.created_at || donation.createdAt);
-      return donationDate >= twoWeeksAgo && donationDate < oneWeekAgo;
-    });
-    
-    const thisWeekTotal = thisWeekDonations.reduce((sum, d) => {
-      const amount = d.donation_amt || d.amount || d.donation_amount || d.value || 0;
-      const numAmount = Number(amount);
-      return sum + (isNaN(numAmount) ? 0 : numAmount);
-    }, 0);
-    
-    const lastWeekTotal = lastWeekDonations.reduce((sum, d) => {
-      const amount = d.donation_amt || d.amount || d.donation_amount || d.value || 0;
-      const numAmount = Number(amount);
-      return sum + (isNaN(numAmount) ? 0 : numAmount);
-    }, 0);
-    
-    if (lastWeekTotal === 0) return thisWeekTotal > 0 ? "+100%" : "+0%";
-    
-    const percentChange = ((thisWeekTotal - lastWeekTotal) / lastWeekTotal * 100).toFixed(1);
-    return `${percentChange >= 0 ? '+' : ''}${percentChange}% from last week`;
-  };
+  }
+
+  const pieData = genderCounts;
+
+const calculateDonationTrend = () => {
+  if (donationsArr.length === 0) return "+0%";
+  
+  // Use GMT+8 timezone
+  const now = new Date();
+ const gmt8Now = new Date(now.getTime() + (12 * 60 * 60 * 1000)); // GMT+8 + 4 hours = GMT+12
+  console.log(gmt8Now);
+
+  const oneWeekAgo = new Date(gmt8Now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const twoWeeksAgo = new Date(gmt8Now.getTime() - 14 * 24 * 60 * 60 * 1000);
+  
+  // This week: from oneWeekAgo to now
+  const thisWeekDonations = donationsArr.filter(donation => {
+    const dateField = donation.donation_datetime;
+    if (!dateField) return false;
+    const donationDate = new Date(new Date(dateField).getTime() + (8 * 60 * 60 * 1000));
+    return donationDate >= oneWeekAgo && donationDate <= gmt8Now;
+  });
+  
+  // Last week: from two weeks ago to one week ago
+  const lastWeekDonations = donationsArr.filter(donation => {
+    const dateField = donation.donation_datetime;
+    if (!dateField) return false;
+    const donationDate = new Date(new Date(dateField).getTime() + (8 * 60 * 60 * 1000));
+    return donationDate >= twoWeeksAgo && donationDate < oneWeekAgo;
+  });
+  
+  const thisWeekTotal = thisWeekDonations.reduce((sum, d) => {
+    const amount = d.donation_amt || d.amount || d.donation_amount || d.value || 0;
+    const numAmount = Number(amount);
+    return sum + (isNaN(numAmount) ? 0 : numAmount);
+  }, 0);
+  
+  const lastWeekTotal = lastWeekDonations.reduce((sum, d) => {
+    const amount = d.donation_amt || d.amount || d.donation_amount || d.value || 0;
+    const numAmount = Number(amount);
+    return sum + (isNaN(numAmount) ? 0 : numAmount);
+  }, 0);
+  
+  // If last week was 0 and this week has donations, show +100%
+  if (lastWeekTotal === 0) return thisWeekTotal > 0 ? "+100%" : "+0%";
+  
+  const percentChange = ((thisWeekTotal - lastWeekTotal) / lastWeekTotal * 100).toFixed(1);
+  return `${percentChange >= 0 ? '+' : ''}${percentChange}%`;
+};
 
   return (
     <div className="p-8 bg-gradient-to-br from-slate-50 to-slate-50 min-h-screen">
-      {/* Debug Information - Remove this in production */}
-      <div className="mb-4 p-4 bg-yellow-100 border border-yellow-400 rounded">
-        <h3 className="font-bold">Debug Info:</h3>
-        <p>Donations count: {donationsArr.length}</p>
-        <p>Total donations calculated: ${totalDonations}</p>
-        <p>Sample donation data: {donationsArr.length > 0 ? JSON.stringify(donationsArr[0]) : 'No data'}</p>
-        <button 
-          onClick={() => {
-            console.log('Manual API test...');
-            fetch('http://10.0.2.2:8000/api/v1/donations')
-              .then(res => {
-                console.log('Manual fetch response:', res);
-                return res.json();
-              })
-              .then(data => {
-                console.log('Manual fetch data:', data);
-              })
-              .catch(err => {
-                console.error('Manual fetch error:', err);
-              });
-          }}
-          className="ml-4 px-4 py-2 bg-blue-500 text-white rounded"
-        >
-          Test API Manually
-        </button>
-      </div>
-
       {/* Total Donations Card - Now Dynamic */}
       <div className="mb-8">
         <div className="relative overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-gradient-to-br from-emerald-500 to-blue-600" style={{ minHeight: '200px' }}>
@@ -356,12 +363,20 @@ const HomeView = () => {
         </div>
       </div>
 
-      {/* Charts Row */}
+      {/* NEW: Chart Controls Selector */}
+      <ChartControlsSelector 
+        timeGrouping={timeGrouping}
+        setTimeGrouping={setTimeGrouping}
+        topMerchantsLimit={topMerchantsLimit}
+        setTopMerchantsLimit={setTopMerchantsLimit}
+      />
+
+      {/* UPDATED: Charts Row */}
       <div className="grid grid-cols-2 gap-6 mb-8">
         <ChartCard title="Orders Over Time">
-          <ResponsiveContainer width="100%" height={275}>
+          <ResponsiveContainer width="100%" height={getChartHeight()}>
             <LineChart data={ordersOverTimeData}>
-              <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+              <XAxis dataKey="period" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} />
               <Tooltip 
                 contentStyle={{ 
@@ -369,7 +384,11 @@ const HomeView = () => {
                   border: 'none', 
                   borderRadius: '12px', 
                   boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
-                }} 
+                }}
+                formatter={(value, name) => [
+                  `$${value.toLocaleString()}`, 
+                  name === 'amount' ? 'Revenue' : name
+                ]}
               />
               <Line 
                 type="monotone" 
@@ -384,7 +403,7 @@ const HomeView = () => {
         </ChartCard>
 
         <ChartCard title="Orders by Merchant">
-          <div style={{ width: '100%', height: '330px' }}>
+          <div style={{ width: '100%', height: `${getChartHeight()}px` }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={ordersByMerchantData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <XAxis type="number" tick={{ fontSize: 12 }} />
@@ -395,25 +414,21 @@ const HomeView = () => {
                     border: 'none', 
                     borderRadius: '12px', 
                     boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
-                  }} 
+                  }}
+                  formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']}
                 />
                 <Bar dataKey="value" fill="url(#gradient2)" radius={[0, 8, 8, 0]} />
-                <defs>
-                  <linearGradient id="gradient2" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#F59E0B" />
-                    <stop offset="100%" stopColor="#EF4444" />
-                  </linearGradient>
-                </defs>
+                <ChartGradients />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </ChartCard>
       </div>
 
-      {/* Charts Row 2 */}
+      {/* UPDATED: Charts Row 2 */}
       <div className="grid grid-cols-2 gap-6 mb-8">
-        <ChartCard title="Top Merchants by Sales">
-          <div style={{ width: '100%', height: '330px' }}>
+        <ChartCard title={`Top ${topMerchantsLimit === -1 ? 'All' : topMerchantsLimit} Merchants by Sales`}>
+          <div style={{ width: '100%', height: `${getChartHeight()}px` }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={topMerchantsData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <XAxis type="number" tick={{ fontSize: 12 }} />
@@ -424,22 +439,18 @@ const HomeView = () => {
                     border: 'none', 
                     borderRadius: '12px', 
                     boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
-                  }} 
+                  }}
+                  formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']}
                 />
                 <Bar dataKey="value" fill="url(#gradient3)" radius={[0, 8, 8, 0]} />
-                <defs>
-                  <linearGradient id="gradient3" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#8B5CF6" />
-                    <stop offset="100%" stopColor="#EC4899" />
-                  </linearGradient>
-                </defs>
+                <ChartGradients />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </ChartCard>
 
         <ChartCard title="User Gender Distribution">
-          <ResponsiveContainer width="100%" height={330}>
+          <ResponsiveContainer width="100%" height={getChartHeight()}>
             <PieChart>
               <Pie
                 data={pieData}
