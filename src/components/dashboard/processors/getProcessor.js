@@ -49,7 +49,6 @@ export const testApiConnection = async () => {
 export const getAllUsers = async () => {
   try {
     const data = await apiRequest('/users');
-    console.log('Users API response:', data);
     
     // Handle different response structures using helper function
     let users = [];
@@ -93,7 +92,6 @@ export const getAllUsers = async () => {
 export const getUserById = async (id) => {
   try {
     const data = await apiRequest(`/users/${id}`);
-    console.log(`User ${id} API response:`, data);
     
     // Return normalized single user data structure
     if (data) {
@@ -126,7 +124,6 @@ export const getUserById = async (id) => {
 export const getAllDonations = async () => {
   try {
     const data = await apiRequest('/donations');
-    console.log('Donations API response:', data);
     
     // Handle different response structures
     if (Array.isArray(data)) {
@@ -150,7 +147,6 @@ export const getAllDonations = async () => {
 export const getDonationById = async (id) => {
   try {
     const data = await apiRequest(`/donations/${id}`);
-    console.log(`Donation ${id} API response:`, data);
     return data;
   } catch (error) {
     console.error(`Failed to fetch donation ${id}:`, error);
@@ -162,7 +158,6 @@ export const getDonationById = async (id) => {
 export const getAllOrders = async () => {
   try {
     const data = await apiRequest('/orders');
-    console.log('Orders API response:', data);
     
     // Handle different response structures
     let orders = [];
@@ -197,7 +192,6 @@ export const getAllOrders = async () => {
         ...order
       };
       
-      console.log(`Order ${order.order_id}: original total_order_cost:`, order.total_order_cost, 'parsed:', processedOrder.total_order_cost);
       return processedOrder;
     });
   } catch (error) {

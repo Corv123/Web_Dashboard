@@ -67,25 +67,34 @@ const HomeView = () => {
   const ordersArr = Array.isArray(orders) ? orders : [];
   const usersArr = Array.isArray(users) ? users : [];
 
-  // Enhanced calculation with multiple field checks and debugging
-  const totalDonations = donationsArr.reduce((sum, donation) => {
-    // Try different possible field names for amount
-    const amount = donation.donation_amt || donation.amount || donation.donation_amount || donation.value || 0;
-    const numAmount = Number(amount);
-    
-    return sum + (isNaN(numAmount) ? 0 : numAmount);
-  }, 0);
+// Enhanced calculation with multiple field checks and proper Decimal128 handling
+const totalDonations = donationsArr.reduce((sum, donation) => {
+  // Try different possible field names for amount
+  let amount = donation.donation_amt || donation.amount || donation.donation_amount || donation.value || 0;
+  
+  // Handle MongoDB Decimal128 format
+  if (amount && typeof amount === 'object' && amount.$numberDecimal) {
+    amount = parseFloat(amount.$numberDecimal); // Actually use the parsed value!
+  } else {
+    amount = Number(amount) || 0; // Convert to number for other formats
+  }
 
-  // Add debugging for the total
-  console.log('Final total donations:', totalDonations);
-  console.log('Number of donations processed:', donationsArr.length);
+  return sum + (isNaN(amount) ? 0 : amount);
+}, 0);
 
-  // Calculate total DSGD donations with enhanced field checking
-  const totalDsgdDonations = donationsArr.reduce((sum, donation) => {
-    const dsgdAmount = donation.donation_dsgd_amt || donation.dsgd_amount || donation.donation_dsgd || 0;
-    const numDsgdAmount = Number(dsgdAmount);
-    return sum + (isNaN(numDsgdAmount) ? 0 : numDsgdAmount);
-  }, 0);
+// Also fix the DSGD donations calculation
+const totalDsgdDonations = donationsArr.reduce((sum, donation) => {
+  let dsgdAmount = donation.donation_dsgd_amt || donation.dsgd_amount || donation.donation_dsgd || 0;
+  
+  // Handle MongoDB Decimal128 format
+  if (dsgdAmount && typeof dsgdAmount === 'object' && dsgdAmount.$numberDecimal) {
+    dsgdAmount = parseFloat(dsgdAmount.$numberDecimal);
+  } else {
+    dsgdAmount = Number(dsgdAmount) || 0;
+  }
+  
+  return sum + (isNaN(dsgdAmount) ? 0 : dsgdAmount);
+}, 0);
 
   // Calculate unique merchants count
   const uniqueMerchants = [...new Set(ordersArr.map(order => order.merchant_name).filter(Boolean))];
@@ -127,34 +136,19 @@ const calculateDonationTrend = () => {
   
   // Get current date in SGT (GMT+8)
   const now = new Date();
-  const currentSGT = new Date(now.getTime() + (8 * 60 * 60 * 1000));
   
   // Calculate date ranges for this week and last week
-  // This week: July 17-23, 2025
-  // Last week: July 10-16, 2025
   const thisWeekStart = new Date('2025-07-17T00:00:00+08:00');
   const thisWeekEnd = new Date('2025-07-23T23:59:59+08:00');
   const lastWeekStart = new Date('2025-07-10T00:00:00+08:00');
   const lastWeekEnd = new Date('2025-07-16T23:59:59+08:00');
-  
-  console.log('Date ranges:');
-  console.log('This week:', thisWeekStart, 'to', thisWeekEnd);
-  console.log('Last week:', lastWeekStart, 'to', lastWeekEnd);
   
   // Filter donations for this week
   const thisWeekDonations = donationsArr.filter(donation => {
     const dateField = donation.donation_datetime;
     if (!dateField) return false;
     
-    // Parse the donation date
     const donationDate = new Date(dateField);
-    
-    console.log('Checking donation:', {
-      original_date: dateField,
-      parsed_date: donationDate,
-      is_this_week: donationDate >= thisWeekStart && donationDate <= thisWeekEnd
-    });
-    
     return donationDate >= thisWeekStart && donationDate <= thisWeekEnd;
   });
   
@@ -164,27 +158,34 @@ const calculateDonationTrend = () => {
     if (!dateField) return false;
     
     const donationDate = new Date(dateField);
-    
-    console.log('Checking donation for last week:', {
-      original_date: dateField,
-      parsed_date: donationDate,
-      is_last_week: donationDate >= lastWeekStart && donationDate <= lastWeekEnd
-    });
-    
     return donationDate >= lastWeekStart && donationDate <= lastWeekEnd;
   });
   
-  // Calculate totals
+  // Calculate totals with proper Decimal128 handling
   const thisWeekTotal = thisWeekDonations.reduce((sum, d) => {
-    const amount = d.donation_amt || d.amount || d.donation_amount || d.value || 0;
-    const numAmount = Number(amount);
-    return sum + (isNaN(numAmount) ? 0 : numAmount);
+    let amount = d.donation_amt || d.amount || d.donation_amount || d.value || 0;
+    
+    // Handle MongoDB Decimal128 format
+    if (amount && typeof amount === 'object' && amount.$numberDecimal) {
+      amount = parseFloat(amount.$numberDecimal);
+    } else {
+      amount = Number(amount) || 0;
+    }
+    
+    return sum + (isNaN(amount) ? 0 : amount);
   }, 0);
   
   const lastWeekTotal = lastWeekDonations.reduce((sum, d) => {
-    const amount = d.donation_amt || d.amount || d.donation_amount || d.value || 0;
-    const numAmount = Number(amount);
-    return sum + (isNaN(numAmount) ? 0 : numAmount);
+    let amount = d.donation_amt || d.amount || d.donation_amount || d.value || 0;
+    
+    // Handle MongoDB Decimal128 format
+    if (amount && typeof amount === 'object' && amount.$numberDecimal) {
+      amount = parseFloat(amount.$numberDecimal);
+    } else {
+      amount = Number(amount) || 0;
+    }
+    
+    return sum + (isNaN(amount) ? 0 : amount);
   }, 0);
   
   console.log('Week totals:', {
@@ -202,6 +203,7 @@ const calculateDonationTrend = () => {
   const percentChange = ((thisWeekTotal - lastWeekTotal) / lastWeekTotal * 100).toFixed(1);
   return `${percentChange >= 0 ? '+' : ''}${percentChange}%`;
 };
+
 
 // =========================
 // 1st chart - Orders Over Time
@@ -304,7 +306,7 @@ const ordersByMerchantData = filteredOrders
                 <p className="text-5xl font-bold text-white mb-4">
                   ${totalDonations.toLocaleString()}
                 </p>
-                <p className="text-green-200 text-lg">{calculateDonationTrend()}</p>
+                <p className="text-green-200 text-lg">{calculateDonationTrend()} from last week</p>
               </div>
               <div className="p-4 rounded-xl text-emerald-400 bg-white/20 backdrop-blur-sm">
                 <DollarSign size={40} className="text-white" />

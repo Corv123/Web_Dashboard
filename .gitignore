@@ -4,3 +4,6 @@
 *.pack
 *.mjs
 *.json
+*.pack
+*.pack
+/node_modules/.cache
