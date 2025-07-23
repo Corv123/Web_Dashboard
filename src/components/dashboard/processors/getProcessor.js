@@ -1,4 +1,22 @@
-import { API_BASE_URL, apiRequest, handleApiResponse } from "../../../services/api";
+import { API_BASE_URL, apiRequest } from "../../../services/api";
+
+// Helper function to safely convert Decimal128 to number
+const parseDecimal128 = (value) => {
+  if (value === null || value === undefined) return 0;
+  
+  // Handle Decimal128 object structure
+  if (typeof value === 'object' && value.$numberDecimal) {
+    return parseFloat(value.$numberDecimal) || 0;
+  }
+  
+  // Handle string representation
+  if (typeof value === 'string') {
+    return parseFloat(value) || 0;
+  }
+  
+  // Handle regular number
+  return Number(value) || 0;
+};
 
 // Test connection function
 export const testApiConnection = async () => {
@@ -140,7 +158,7 @@ export const getDonationById = async (id) => {
   }
 };
 
-// Orders API
+// Orders API - UPDATED for Decimal128 support
 export const getAllOrders = async () => {
   try {
     const data = await apiRequest('/orders');
@@ -161,26 +179,29 @@ export const getAllOrders = async () => {
       return [];
     }
 
-    // Return raw data with minimal processing - detailed processing in utils
-    return orders.map(order => ({
-      id: order.order_id || order._id || order.id,
-      order_id: order.order_id,
-      order_status: order.order_status,
-      order_cost: Number(order.order_cost) || 0,
-      total_order_cost: Number(order.total_order_cost) || 0,
-      order_type: order.order_type,
-      merchant_name: order.merchant_name,
-      merchant_location: order.merchant_location,
-      order_complete_datetime: order.order_complete_datetime,
-      user_id: order.user_id,
-      order_tokens: order.order_tokens,
-      order_items: order.order_items || [],
-      // Keep original structure for backward compatibility
-      ...order
-    }));
+    // Return processed data with proper Decimal128 handling
+    return orders.map(order => {
+      const processedOrder = {
+        order_status: order.order_status,
+        order_cost: parseDecimal128(order.order_cost), // Handle legacy field
+        total_order_cost: parseDecimal128(order.total_order_cost), // Handle Decimal128
+        order_type: order.order_type,
+        merchant_name: order.merchant_name,
+        merchant_location: order.merchant_location,
+        order_complete_datetime: order.order_complete_datetime,
+        user_id: order.user_id,
+        order_tokens: order.order_tokens,
+        order_items: order.order_items || [],
+        order_id: order.order_id,
+        // Keep original structure for backward compatibility
+        ...order
+      };
+      
+      console.log(`Order ${order.order_id}: original total_order_cost:`, order.total_order_cost, 'parsed:', processedOrder.total_order_cost);
+      return processedOrder;
+    });
   } catch (error) {
     console.error('Failed to fetch orders:', error);
     return [];
   }
 };
-

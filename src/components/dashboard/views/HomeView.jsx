@@ -4,8 +4,9 @@ import { BarChart, Bar, XAxis, YAxis, LineChart, Line, PieChart, Pie, Cell, Resp
 import StatCard from '../components/StatCard';
 import ChartCard from '../components/ChartCard';
 import { getAllDonations, getAllOrders, getAllUsers } from '../processors/getProcessor.js';
+import { processOrdersOverTime, getOrdersOverTimeConfig } from '../processors/ordersOverTime.js';
 import dayjs from 'dayjs';
-import { chartConfig, timeFormats, ChartGradients, ChartControlsSelector} from '../processors/chartProcessor.js'
+import { chartConfig, ChartGradients, ChartControlsSelector} from '../processors/chartProcessor.js'
 
 const HomeView = () => {
   const [donations, setDonations] = useState([]);
@@ -41,10 +42,11 @@ const HomeView = () => {
       })
       .catch(error => {
         setDonations([]);
-      });
+    });
     
-    getAllOrders().then(res => {
-      const data = Array.isArray(res)
+    getAllOrders()
+      .then(res => {
+        const data = Array.isArray(res)
         ? res
         : (res.result && Array.isArray(res.result.data) ? res.result.data : []);
       setOrders(data);
@@ -58,7 +60,6 @@ const HomeView = () => {
     });
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
   const getChartHeight = () => chartConfig.chartHeights[screenSize];
 
   // Defensive: Only reduce if array
@@ -71,16 +72,6 @@ const HomeView = () => {
     // Try different possible field names for amount
     const amount = donation.donation_amt || donation.amount || donation.donation_amount || donation.value || 0;
     const numAmount = Number(amount);
-    
-    // Debug each donation
-    console.log('Processing donation:', {
-      id: donation._id || donation.id,
-      raw_donation_amt: donation.donation_amt,
-      raw_amount: donation.amount,
-      chosen_amount: amount,
-      converted_amount: numAmount,
-      is_valid: !isNaN(numAmount)
-    });
     
     return sum + (isNaN(numAmount) ? 0 : numAmount);
   }, 0);
@@ -98,7 +89,7 @@ const HomeView = () => {
 
   // Calculate unique merchants count
   const uniqueMerchants = [...new Set(ordersArr.map(order => order.merchant_name).filter(Boolean))];
-
+/*
   // Donation analytics with enhanced field checking
   const donationsByType = donationsArr.reduce((acc, donation) => {
     const type = donation.donation_type || 'Unknown';
@@ -118,7 +109,7 @@ const HomeView = () => {
 
   const completedDonations = donationsArr.filter(d => d.donation_status === 'completed').length;
   const pendingDonations = donationsArr.filter(d => d.donation_status !== 'completed').length;
-
+*/
   // Filter orders by date range
   const filteredOrders = ordersArr.filter(order => {
     if (!order.order_complete_datetime) return false;
@@ -128,69 +119,127 @@ const HomeView = () => {
     return true;
   });
 
-    // UPDATED: Current Week Daily Orders (Line Chart) - GMT+8 timezone
-  const ordersOverTimeData = (() => {
-    // Get current date in GMT+8
-    const now = new Date();
-    const gmt8Now = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+// =========================
+// top padding - Donation Trend
+// =========================
+const calculateDonationTrend = () => {
+  if (donationsArr.length === 0) return "+0%";
+  
+  // Get current date in SGT (GMT+8)
+  const now = new Date();
+  const currentSGT = new Date(now.getTime() + (8 * 60 * 60 * 1000));
+  
+  // Calculate date ranges for this week and last week
+  // This week: July 17-23, 2025
+  // Last week: July 10-16, 2025
+  const thisWeekStart = new Date('2025-07-17T00:00:00+08:00');
+  const thisWeekEnd = new Date('2025-07-23T23:59:59+08:00');
+  const lastWeekStart = new Date('2025-07-10T00:00:00+08:00');
+  const lastWeekEnd = new Date('2025-07-16T23:59:59+08:00');
+  
+  console.log('Date ranges:');
+  console.log('This week:', thisWeekStart, 'to', thisWeekEnd);
+  console.log('Last week:', lastWeekStart, 'to', lastWeekEnd);
+  
+  // Filter donations for this week
+  const thisWeekDonations = donationsArr.filter(donation => {
+    const dateField = donation.donation_datetime;
+    if (!dateField) return false;
     
-    // For this specific case, if today is 23rd, we want 17-23
-    // So we go back 6 days from today to get the start (17th)
-    const weekStart = new Date(gmt8Now.getTime() - (6 * 24 * 60 * 60 * 1000));
-    weekStart.setHours(0, 0, 0, 0);
+    // Parse the donation date
+    const donationDate = new Date(dateField);
     
-    // Generate 7 days starting from weekStart
-    const days = [];
-    for (let i = 0; i < 7; i++) {
-      const dayDate = new Date(weekStart.getTime() + (i * 24 * 60 * 60 * 1000));
-      const dayNumber = dayDate.getDate();
-      
-      days.push({
-        period: dayNumber.toString(),
-        date: dayDate,
-        amount: 0,
-        count: 0
-      });
-    }
-    
-    // Group orders by day
-    filteredOrders.forEach(order => {
-      if (!order.order_complete_datetime) return;
-      
-      // Convert order date to GMT+8
-      const orderDate = new Date(order.order_complete_datetime);
-      const orderGmt8 = new Date(orderDate.getTime() + (8 * 60 * 60 * 1000));
-      
-      // Find which day this order belongs to
-      const dayIndex = days.findIndex(day => {
-        const dayStart = new Date(day.date);
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(day.date);
-        dayEnd.setHours(23, 59, 59, 999);
-        
-        return orderGmt8 >= dayStart && orderGmt8 <= dayEnd;
-      });
-      
-      if (dayIndex !== -1) {
-        days[dayIndex].amount += Number(order.order_cost) || 0;
-        days[dayIndex].count += 1;
-      }
+    console.log('Checking donation:', {
+      original_date: dateField,
+      parsed_date: donationDate,
+      is_this_week: donationDate >= thisWeekStart && donationDate <= thisWeekEnd
     });
     
-    return days;
-  })();
+    return donationDate >= thisWeekStart && donationDate <= thisWeekEnd;
+  });
+  
+  // Filter donations for last week  
+  const lastWeekDonations = donationsArr.filter(donation => {
+    const dateField = donation.donation_datetime;
+    if (!dateField) return false;
+    
+    const donationDate = new Date(dateField);
+    
+    console.log('Checking donation for last week:', {
+      original_date: dateField,
+      parsed_date: donationDate,
+      is_last_week: donationDate >= lastWeekStart && donationDate <= lastWeekEnd
+    });
+    
+    return donationDate >= lastWeekStart && donationDate <= lastWeekEnd;
+  });
+  
+  // Calculate totals
+  const thisWeekTotal = thisWeekDonations.reduce((sum, d) => {
+    const amount = d.donation_amt || d.amount || d.donation_amount || d.value || 0;
+    const numAmount = Number(amount);
+    return sum + (isNaN(numAmount) ? 0 : numAmount);
+  }, 0);
+  
+  const lastWeekTotal = lastWeekDonations.reduce((sum, d) => {
+    const amount = d.donation_amt || d.amount || d.donation_amount || d.value || 0;
+    const numAmount = Number(amount);
+    return sum + (isNaN(numAmount) ? 0 : numAmount);
+  }, 0);
+  
+  console.log('Week totals:', {
+    thisWeekDonations: thisWeekDonations.length,
+    thisWeekTotal,
+    lastWeekDonations: lastWeekDonations.length,
+    lastWeekTotal
+  });
+  
+  // Calculate percentage change
+  if (lastWeekTotal === 0) {
+    return thisWeekTotal > 0 ? "+100%" : "+0%";
+  }
+  
+  const percentChange = ((thisWeekTotal - lastWeekTotal) / lastWeekTotal * 100).toFixed(1);
+  return `${percentChange >= 0 ? '+' : ''}${percentChange}%`;
+};
 
+// =========================
+// 1st chart - Orders Over Time
+// =========================
 
-  // Orders by Merchant (Bar Chart)
-  const ordersByMerchantData = filteredOrders.reduce((acc, order) => {
-    const found = acc.find(item => item.name === order.merchant_name);
+  // UPDATED: Use the new processor for orders over time (pass all orders, not filtered)
+  const ordersOverTimeData = processOrdersOverTime(ordersArr, startDate, endDate, timeGrouping);
+  const ordersOverTimeConfig = getOrdersOverTimeConfig(timeGrouping);
+
+// Add this helper function at the top of your HomeView component
+const extractCost = (costField) => {
+  if (costField && typeof costField === 'object' && costField.$numberDecimal) {
+    return parseFloat(costField.$numberDecimal);
+  }
+  return Number(costField) || 0;
+};
+
+// =======================
+// Orders by Merchant
+// =======================
+
+// Orders by Merchant (Bar Chart) - FIXED VERSION
+const ordersByMerchantData = filteredOrders
+  .reduce((acc, order) => {
+    const merchantName = order.merchant_name;
+    if (!merchantName) return acc; // Skip orders without merchant name
+    
+    const found = acc.find(item => item.name === merchantName);
+    const cost = extractCost(order.order_cost);
+    
     if (found) {
-      found.value += Number(order.order_cost);
+      found.value += cost;
     } else {
-      acc.push({ name: order.merchant_name, value: Number(order.order_cost) });
+      acc.push({ name: merchantName, value: cost });
     }
     return acc;
-  }, []);
+  }, [])
+  .sort((a, b) => b.value - a.value); // Sort by revenue in descending order
 
   // UPDATED: Dynamic Top Merchants by Sales (Bar Chart)
   const topMerchantsData = Array.isArray(ordersByMerchantData)
@@ -233,51 +282,14 @@ const HomeView = () => {
 
   const pieData = genderCounts;
 
-const calculateDonationTrend = () => {
-  if (donationsArr.length === 0) return "+0%";
-  
-  // Use GMT+8 timezone
-  const now = new Date();
- const gmt8Now = new Date(now.getTime() + (12 * 60 * 60 * 1000)); // GMT+8 + 4 hours = GMT+12
-  console.log(gmt8Now);
+  console.log('=== DEBUGGING CHART DATA ===');
+  console.log('ordersByMerchantData:', ordersByMerchantData);
+  console.log('Length:', ordersByMerchantData.length);
+  if (ordersByMerchantData.length > 0) {
+    console.log('Max value:', Math.max(...ordersByMerchantData.map(d => d.value)));
+    console.log('Sample items:', ordersByMerchantData.slice(0, 3));
+  }
 
-  const oneWeekAgo = new Date(gmt8Now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const twoWeeksAgo = new Date(gmt8Now.getTime() - 14 * 24 * 60 * 60 * 1000);
-  
-  // This week: from oneWeekAgo to now
-  const thisWeekDonations = donationsArr.filter(donation => {
-    const dateField = donation.donation_datetime;
-    if (!dateField) return false;
-    const donationDate = new Date(new Date(dateField).getTime() + (8 * 60 * 60 * 1000));
-    return donationDate >= oneWeekAgo && donationDate <= gmt8Now;
-  });
-  
-  // Last week: from two weeks ago to one week ago
-  const lastWeekDonations = donationsArr.filter(donation => {
-    const dateField = donation.donation_datetime;
-    if (!dateField) return false;
-    const donationDate = new Date(new Date(dateField).getTime() + (8 * 60 * 60 * 1000));
-    return donationDate >= twoWeeksAgo && donationDate < oneWeekAgo;
-  });
-  
-  const thisWeekTotal = thisWeekDonations.reduce((sum, d) => {
-    const amount = d.donation_amt || d.amount || d.donation_amount || d.value || 0;
-    const numAmount = Number(amount);
-    return sum + (isNaN(numAmount) ? 0 : numAmount);
-  }, 0);
-  
-  const lastWeekTotal = lastWeekDonations.reduce((sum, d) => {
-    const amount = d.donation_amt || d.amount || d.donation_amount || d.value || 0;
-    const numAmount = Number(amount);
-    return sum + (isNaN(numAmount) ? 0 : numAmount);
-  }, 0);
-  
-  // If last week was 0 and this week has donations, show +100%
-  if (lastWeekTotal === 0) return thisWeekTotal > 0 ? "+100%" : "+0%";
-  
-  const percentChange = ((thisWeekTotal - lastWeekTotal) / lastWeekTotal * 100).toFixed(1);
-  return `${percentChange >= 0 ? '+' : ''}${percentChange}%`;
-};
 
   return (
     <div className="p-8 bg-gradient-to-br from-slate-50 to-slate-50 min-h-screen">
@@ -371,9 +383,9 @@ const calculateDonationTrend = () => {
         setTopMerchantsLimit={setTopMerchantsLimit}
       />
 
-      {/* UPDATED: Charts Row */}
+      {/* Charts: Orders Over Time and Orders by Merchant */}
       <div className="grid grid-cols-2 gap-6 mb-8">
-        <ChartCard title="Orders Over Time">
+        <ChartCard title={ordersOverTimeConfig.title}>
           <ResponsiveContainer width="100%" height={getChartHeight()}>
             <LineChart data={ordersOverTimeData}>
               <XAxis dataKey="period" tick={{ fontSize: 12 }} />
@@ -387,7 +399,7 @@ const calculateDonationTrend = () => {
                 }}
                 formatter={(value, name) => [
                   `$${value.toLocaleString()}`, 
-                  name === 'amount' ? 'Revenue' : name
+                  ordersOverTimeConfig.tooltipLabel
                 ]}
               />
               <Line 
@@ -402,30 +414,48 @@ const calculateDonationTrend = () => {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Orders by Merchant">
-          <div style={{ width: '100%', height: `${getChartHeight()}px` }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={ordersByMerchantData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <XAxis type="number" tick={{ fontSize: 12 }} />
-                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)', 
-                    border: 'none', 
-                    borderRadius: '12px', 
-                    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
-                  }}
-                  formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']}
-                />
-                <Bar dataKey="value" fill="url(#gradient2)" radius={[0, 8, 8, 0]} />
-                <ChartGradients />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </ChartCard>
+<ChartCard title="Orders by Merchant">
+  <div style={{ width: '100%', height: `${getChartHeight()}px` }}>
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart 
+        data={ordersByMerchantData} 
+        layout="vertical" 
+        margin={{ right: 35}}
+      >
+        <XAxis 
+          type="number" 
+          tick={{ fontSize: 12 }} 
+          domain={[0, (dataMax) => Math.ceil(dataMax * 1.05)]}
+        />
+        <YAxis 
+          dataKey="name" 
+          type="category" 
+          width={120} 
+          tick={{ fontSize: 10 }} 
+        />
+        <Tooltip 
+          contentStyle={{ 
+            backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+            border: 'none', 
+            borderRadius: '12px', 
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
+          }}
+          formatter={(value) => [`$${Number(value).toFixed(2)}`, 'Revenue']}
+        />
+        <Bar 
+          dataKey="value" 
+          fill="#8884d8"
+          radius={[0, 4, 4, 0]}
+          minPointSize={3}
+        />
+        <ChartGradients />
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</ChartCard>
       </div>
 
-      {/* UPDATED: Charts Row 2 */}
+      {/* Charts: Top 5 Merchant by Sales / User Gender Distribution */}
       <div className="grid grid-cols-2 gap-6 mb-8">
         <ChartCard title={`Top ${topMerchantsLimit === -1 ? 'All' : topMerchantsLimit} Merchants by Sales`}>
           <div style={{ width: '100%', height: `${getChartHeight()}px` }}>
@@ -442,7 +472,7 @@ const calculateDonationTrend = () => {
                   }}
                   formatter={(value) => [`$${value.toLocaleString()}`, 'Revenue']}
                 />
-                <Bar dataKey="value" fill="url(#gradient3)" radius={[0, 8, 8, 0]} />
+                <Bar dataKey="value" fill="#241e8bff" radius={[0, 8, 8, 0]} />
                 <ChartGradients />
               </BarChart>
             </ResponsiveContainer>
