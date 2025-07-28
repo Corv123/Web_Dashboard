@@ -215,25 +215,32 @@ const DonationsView = () => {
     .sort((a, b) => b.value - a.value)
     .slice(0, 5);
 
-  // Donation types analysis
-  const directDonations = filteredDonations.filter(d => d.donation_type === 'direct' || !d.donation_type).length;
-  const splitDonations = filteredDonations.filter(d => d.donation_type === 'split').length;
-  const totalDonationCount = directDonations + splitDonations;
-  
+  // Donation types analysis (Direct, Round Up, Discount Donate)
+  const directDonations = filteredDonations.filter(d => d.donation_type === 'direct_donation' || !d.donation_type).length;
+  const roundUpDonations = filteredDonations.filter(d => d.donation_type === 'round_up').length;
+  const discountDonations = filteredDonations.filter(d => d.donation_type === 'discount_donate').length;
+  const totalDonationCount = directDonations + roundUpDonations + discountDonations;
+
   const donationTypes = totalDonationCount > 0 ? [
-    { 
-      name: 'Direct', 
-      value: Math.round((directDonations / totalDonationCount) * 100), 
+    {
+      name: 'Direct Donation',
+      value: Math.round((directDonations / totalDonationCount) * 100),
       color: chartConfig.pieColors[0] || '#8B5CF6'
     },
-    { 
-      name: 'Split', 
-      value: Math.round((splitDonations / totalDonationCount) * 100), 
+    {
+      name: 'Round Up',
+      value: Math.round((roundUpDonations / totalDonationCount) * 100),
       color: chartConfig.pieColors[1] || '#EC4899'
+    },
+    {
+      name: 'Discount Donate',
+      value: Math.round((discountDonations / totalDonationCount) * 100),
+      color: chartConfig.pieColors[2] || '#F59E0B'
     }
   ] : [
-    { name: 'Direct', value: 75, color: chartConfig.pieColors[0] || '#8B5CF6' },
-    { name: 'Split', value: 25, color: chartConfig.pieColors[1] || '#EC4899' }
+    { name: 'Direct Donation', value: 60, color: chartConfig.pieColors[0] || '#8B5CF6' },
+    { name: 'Round Up', value: 25, color: chartConfig.pieColors[1] || '#EC4899' },
+    { name: 'Discount Donate', value: 15, color: chartConfig.pieColors[2] || '#F59E0B' }
   ];
 
   // Donations by location with better location extraction
@@ -284,6 +291,64 @@ const DonationsView = () => {
   };
 
   const timelineData = getDonationTimeline();
+
+  // Top Merchants by Donation Amount (using donation_amt from donations, grouped by merchant_name from orders)
+  // 1. Build a map of donation_id to donation_amt for fast lookup
+  const donationAmtMap = new Map();
+  filteredDonations.forEach(donation => {
+    if (donation.donation_id != null && donation.donation_amt != null) {
+      donationAmtMap.set(String(donation.donation_id), extractDonationAmount(donation));
+    }
+  });
+
+  // 2. Filter orders to those with a valid donation_id and a matching donation
+  const filteredOrders = ordersArr.filter(order => {
+    // Only include orders with a valid donation_id that exists in the donationAmtMap
+    if (!order.donation_id || !donationAmtMap.has(String(order.donation_id))) {
+      return false;
+    }
+    // Date filter (if needed)
+    if (startDate || endDate) {
+      const orderDate = order.order_complete_datetime || order.created_at;
+      if (!orderDate) return false;
+      const orderDateObj = new Date(orderDate);
+      const start = startDate ? new Date(startDate) : new Date('1900-01-01');
+      const end = endDate ? new Date(endDate + 'T23:59:59') : new Date('2100-12-31');
+      if (orderDateObj < start || orderDateObj > end) return false;
+    }
+    return true;
+  });
+
+  // 3. Group by merchant_name and sum donation_amt
+  const merchantsByDonation = filteredOrders.reduce((acc, order) => {
+    const merchantName = order.merchant_name || 'Unknown';
+    const donationId = String(order.donation_id);
+    const donationAmt = donationAmtMap.get(donationId) || 0;
+    const found = acc.find(m => m.name === merchantName);
+    if (found) {
+      found.value += donationAmt;
+    } else {
+      acc.push({ name: merchantName, value: donationAmt });
+    }
+    return acc;
+  }, []);
+
+  const topMerchantsByDonation = merchantsByDonation
+    .filter(m => m.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 5);
+
+  // Share of Donations by Location (merchant_name as location, count of donations per merchant)
+  const locationDonationsCount = {};
+  filteredOrders.forEach(order => {
+    const merchant = order.merchant_name || 'Unknown';
+    locationDonationsCount[merchant] = (locationDonationsCount[merchant] || 0) + 1;
+  });
+
+  const donationsByLocationCount = Object.entries(locationDonationsCount)
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 5)
+    .map(([name, value]) => ({ name, value }));
 
   // Clear filters function
   const clearFilters = () => {
@@ -383,7 +448,7 @@ const DonationsView = () => {
       </div>
       
       {/* Stats Grid */}
-      <div className="grid grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-2 gap-6 mb-8">
         <StatCard
           title="Total Donations"
           value={`$${Number(totalDonations).toLocaleString()}`}
@@ -399,14 +464,6 @@ const DonationsView = () => {
           icon={Users}
           bgGradient="bg-gradient-to-br from-blue-500 to-cyan-600"
           iconColor="text-blue-400"
-        />
-        <StatCard
-          title={selectedCampaignId ? "Campaign Focus" : "Active Charities"}
-          value={activeCharities}
-          subtitle={selectedCampaignId ? "Single campaign" : "All active"}
-          icon={Heart}
-          bgGradient="bg-gradient-to-br from-pink-500 to-rose-600"
-          iconColor="text-pink-400"
         />
       </div>
 
@@ -435,10 +492,10 @@ const DonationsView = () => {
 
       {/* Charts Row 1 */}
       <div className="grid grid-cols-2 gap-6 mb-8">
-        <ChartCard title="Top Donation Entries">
+        <ChartCard title="Top Merchants by Donation Amount">
           <div style={{ width: '100%', height: '300px' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topDonationEntries} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <BarChart data={topMerchantsByDonation} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <XAxis 
                   type="number" 
                   tick={{ fontSize: 12 }} 
@@ -459,8 +516,8 @@ const DonationsView = () => {
                   }} 
                   formatter={(value, name, props) => [
                     `$${Number(value).toFixed(2)}`, 
-                    'Amount',
-                    `Donor: ${props.payload.donor}`
+                    'Donation Amount',
+                    `Merchant: ${props.payload.name}`
                   ]}
                 />
                 <Bar 
@@ -543,10 +600,10 @@ const DonationsView = () => {
         </ChartCard>
 
         {/* Share of Donations by Location */}
-        <ChartCard title="Share of Donations by Location">
+        <ChartCard title="Top Merchants by Donation Count">
           <div style={{ width: '100%', height: '300px' }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={donationsByLocation.length > 0 ? donationsByLocation : [
+              <BarChart data={donationsByLocationCount.length > 0 ? donationsByLocationCount : [
                 { name: 'Singapore', value: 12500 },
                 { name: 'Malaysia', value: 8000 },
                 { name: 'Thailand', value: 4000 }
@@ -554,7 +611,8 @@ const DonationsView = () => {
                 <XAxis 
                   type="number" 
                   tick={{ fontSize: 12 }} 
-                  domain={[0, (dataMax) => Math.ceil(dataMax * 1.05)]}
+                  domain={[1, (dataMax) => Math.ceil(dataMax)]}
+                  allowDecimals={false}
                 />
                 <YAxis 
                   dataKey="name" 
@@ -569,7 +627,10 @@ const DonationsView = () => {
                     borderRadius: '12px', 
                     boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
                   }} 
-                  formatter={(value) => [`$${Number(value).toFixed(2)}`, 'Donations']}
+                  formatter={(value) => [
+                    `${value}`,
+                    'Donation Count'
+                  ]}
                 />
                 <Bar 
                   dataKey="value" 
