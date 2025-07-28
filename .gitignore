@@ -7,3 +7,5 @@
 *.pack
 *.pack
 /node_modules/.cache
+*.pack
+node_modules/.cache/.eslintcache
