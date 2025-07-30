@@ -128,19 +128,27 @@ const DonationsView = () => {
     });
   };
 
-  // Apply date filtering if dates are selected
-  const applyDateFilter = (donationsArray) => {
-    if (!startDate && !endDate) return donationsArray;
+  // IMPROVED: Enhanced date filtering function that works with both donations and orders
+  const applyDateFilter = (dataArray, dateFieldNames = ['donation_datetime', 'created_at', 'order_complete_datetime']) => {
+    if (!startDate && !endDate) return dataArray;
     
-    return donationsArray.filter(donation => {
-      const dateField = donation.donation_datetime || donation.created_at;
-      if (!dateField) return true; // Include if no date field
+    return dataArray.filter(item => {
+      // Try multiple date field names
+      let dateField = null;
+      for (const fieldName of dateFieldNames) {
+        if (item[fieldName]) {
+          dateField = item[fieldName];
+          break;
+        }
+      }
       
-      const donationDate = new Date(dateField);
+      if (!dateField) return true; // Include if no date field found
+      
+      const itemDate = new Date(dateField);
       const start = startDate ? new Date(startDate) : new Date('1900-01-01');
       const end = endDate ? new Date(endDate + 'T23:59:59') : new Date('2100-12-31');
       
-      return donationDate >= start && donationDate <= end;
+      return itemDate >= start && itemDate <= end;
     });
   };
 
@@ -148,11 +156,17 @@ const DonationsView = () => {
   let filteredDonations = filterDonationsByCharity(donationsArr, selectedCampaignId);
   filteredDonations = applyDateFilter(filteredDonations);
 
+  // FIXED: Apply date filtering to orders as well
+  let filteredOrdersBase = ordersArr;
+  filteredOrdersBase = applyDateFilter(filteredOrdersBase, ['order_complete_datetime', 'created_at']);
+
   console.log('=== FILTERING DEBUG ===');
   console.log('Selected campaign ID:', selectedCampaignId);
   console.log('Total donations:', donationsArr.length);
   console.log('Filtered by charity:', filterDonationsByCharity(donationsArr, selectedCampaignId).length);
   console.log('Filtered by date range:', filteredDonations.length);
+  console.log('Total orders:', ordersArr.length);
+  console.log('Filtered orders by date:', filteredOrdersBase.length);
   console.log('Current charity info:', currentCharity);
 
   // Calculate metrics
@@ -215,7 +229,7 @@ const DonationsView = () => {
     .sort((a, b) => b.value - a.value)
     .slice(0, 5);
 
-  // Donation types analysis (Direct, Round Up, Discount Donate)
+  // FIXED: Donation types analysis now uses filtered donations
   const directDonations = filteredDonations.filter(d => d.donation_type === 'direct_donation' || !d.donation_type).length;
   const roundUpDonations = filteredDonations.filter(d => d.donation_type === 'round_up').length;
   const discountDonations = filteredDonations.filter(d => d.donation_type === 'discount_donate').length;
@@ -243,7 +257,7 @@ const DonationsView = () => {
     { name: 'Discount Donate', value: 15, color: chartConfig.pieColors[2] || '#F59E0B' }
   ];
 
-  // Donations by location with better location extraction
+  // FIXED: Donations by location now uses filtered donations
   const locationDonations = {};
   filteredDonations.forEach(donation => {
     const user = usersArr.find(u => u.user_id === donation.user_id);
@@ -257,20 +271,40 @@ const DonationsView = () => {
     .slice(0, 10)
     .map(([name, value]) => ({ name, value: parseFloat(value.toFixed(2)) }));
 
-  // Donations over time (daily for last 30 days)
+  // FIXED: Donations over time now properly uses date filters
   const getDonationTimeline = () => {
     const timeline = {};
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 30);
+    
+    // If date filters are applied, use them as bounds, otherwise use last 30 days
+    let endDateForTimeline, startDateForTimeline;
+    
+    if (startDate || endDate) {
+      startDateForTimeline = startDate ? new Date(startDate) : new Date();
+      endDateForTimeline = endDate ? new Date(endDate) : new Date();
+      
+      // If only one date is set, create a reasonable range
+      if (!startDate) {
+        startDateForTimeline = new Date(endDateForTimeline);
+        startDateForTimeline.setDate(startDateForTimeline.getDate() - 30);
+      }
+      if (!endDate) {
+        endDateForTimeline = new Date(startDateForTimeline);
+        endDateForTimeline.setDate(endDateForTimeline.getDate() + 30);
+      }
+    } else {
+      // Default to last 30 days
+      endDateForTimeline = new Date();
+      startDateForTimeline = new Date();
+      startDateForTimeline.setDate(startDateForTimeline.getDate() - 30);
+    }
 
     // Initialize all dates with 0
-    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    for (let d = new Date(startDateForTimeline); d <= endDateForTimeline; d.setDate(d.getDate() + 1)) {
       const dateStr = d.toISOString().split('T')[0];
       timeline[dateStr] = 0;
     }
 
-    // Add donation amounts to timeline
+    // Add donation amounts to timeline from filtered donations
     filteredDonations.forEach(donation => {
       const dateField = donation.donation_datetime || donation.created_at;
       if (dateField) {
@@ -287,13 +321,13 @@ const DonationsView = () => {
         date: dayjs(date).format('MMM DD'),
         amount: parseFloat(amount.toFixed(2))
       }))
-      .slice(-14); // Show last 14 days
+      .slice(-14); // Show last 14 days or less if date range is smaller
   };
 
   const timelineData = getDonationTimeline();
 
-  // Top Merchants by Donation Amount (using donation_amt from donations, grouped by merchant_name from orders)
-  // 1. Build a map of donation_id to donation_amt for fast lookup
+  // FIXED: Top Merchants by Donation Amount - now uses filtered data
+  // 1. Build a map of donation_id to donation_amt for fast lookup from FILTERED donations
   const donationAmtMap = new Map();
   filteredDonations.forEach(donation => {
     if (donation.donation_id != null && donation.donation_amt != null) {
@@ -301,22 +335,10 @@ const DonationsView = () => {
     }
   });
 
-  // 2. Filter orders to those with a valid donation_id and a matching donation
-  const filteredOrders = ordersArr.filter(order => {
-    // Only include orders with a valid donation_id that exists in the donationAmtMap
-    if (!order.donation_id || !donationAmtMap.has(String(order.donation_id))) {
-      return false;
-    }
-    // Date filter (if needed)
-    if (startDate || endDate) {
-      const orderDate = order.order_complete_datetime || order.created_at;
-      if (!orderDate) return false;
-      const orderDateObj = new Date(orderDate);
-      const start = startDate ? new Date(startDate) : new Date('1900-01-01');
-      const end = endDate ? new Date(endDate + 'T23:59:59') : new Date('2100-12-31');
-      if (orderDateObj < start || orderDateObj > end) return false;
-    }
-    return true;
+  // 2. Filter orders to those with a valid donation_id and a matching FILTERED donation
+  const filteredOrders = filteredOrdersBase.filter(order => {
+    // Only include orders with a valid donation_id that exists in the donationAmtMap (which is now from filtered donations)
+    return order.donation_id && donationAmtMap.has(String(order.donation_id));
   });
 
   // 3. Group by merchant_name and sum donation_amt
@@ -338,7 +360,8 @@ const DonationsView = () => {
     .sort((a, b) => b.value - a.value)
     .slice(0, 5);
 
-  // Share of Donations by Location (merchant_name as location, count of donations per merchant)
+  // FIXED: Share of Donations by Location (merchant_name as location, count of donations per merchant)
+  // Now uses filtered orders
   const locationDonationsCount = {};
   filteredOrders.forEach(order => {
     const merchant = order.merchant_name || 'Unknown';
@@ -433,12 +456,12 @@ const DonationsView = () => {
                 <p className="text-sm text-gray-600">{currentCharity.org_email}</p>
                 {currentCharity.org_dns_url && (
                   <a 
-                    href={currentCharity.org_dns_url} 
+                    href={currentCharity.org_dns_url.startsWith('http') ? currentCharity.org_dns_url : `https://${currentCharity.org_dns_url}`} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="text-sm text-blue-600 hover:underline"
                   >
-                    {currentCharity.org_dns_url}
+                    Website
                   </a>
                 )}
               </div>
@@ -611,7 +634,7 @@ const DonationsView = () => {
                 <XAxis 
                   type="number" 
                   tick={{ fontSize: 12 }} 
-                  domain={[1, (dataMax) => Math.ceil(dataMax)]}
+                  domain={[0, (dataMax) => Math.ceil(dataMax)]}
                   allowDecimals={false}
                 />
                 <YAxis 

@@ -416,7 +416,7 @@ const CampaignsView = () => {
                       <div className="text-sm text-gray-900">{charity.org_email}</div>
                       {charity.org_dns_url && (
                         <a 
-                          href={charity.org_dns_url} 
+                          href={charity.org_dns_url.startsWith('http') ? charity.org_dns_url : `https://${charity.org_dns_url}`} 
                           target="_blank" 
                           rel="noopener noreferrer" 
                           className="text-xs text-blue-600 hover:underline"
