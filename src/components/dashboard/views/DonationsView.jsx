@@ -517,19 +517,71 @@ const DonationsView = () => {
       <div className="grid grid-cols-2 gap-6 mb-8">
         <ChartCard title="Top Merchants by Donation Amount">
           <div style={{ width: '100%', height: '300px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topMerchantsByDonation} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <XAxis 
-                  type="number" 
-                  tick={{ fontSize: 12 }} 
-                  domain={[0, (dataMax) => Math.ceil(dataMax * 1.05)]}
-                />
-                <YAxis 
-                  dataKey="name" 
-                  type="category" 
-                  width={120} 
-                  tick={{ fontSize: 10 }} 
-                />
+            {topMerchantsByDonation.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={topMerchantsByDonation} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <XAxis 
+                    type="number" 
+                    tick={{ fontSize: 12 }} 
+                    domain={[0, (dataMax) => Math.ceil(dataMax * 1.05)]}
+                  />
+                  <YAxis 
+                    dataKey="name" 
+                    type="category" 
+                    width={120} 
+                    tick={{ fontSize: 10 }} 
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                      border: 'none', 
+                      borderRadius: '12px', 
+                      boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
+                    }} 
+                    formatter={(value, name, props) => [
+                      `${Number(value).toFixed(2)}`, 
+                      'Donation Amount',
+                      `Merchant: ${props.payload.name}`
+                    ]}
+                  />
+                  <Bar 
+                    dataKey="value" 
+                    fill="#8884d8"
+                    radius={[0, 8, 8, 0]} 
+                    minPointSize={3}
+                  />
+                  <ChartGradients />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                <div className="text-center">
+                  <p className="text-lg mb-2">No Data Available</p>
+                  <p className="text-sm">No merchant donation data found for the selected filters</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </ChartCard>
+
+        <ChartCard title="Direct vs Split Donations">
+          {totalDonationCount > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={donationTypes}
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={120}
+                  innerRadius={60}
+                  dataKey="value"
+                  label={({ name, value }) => `${name}: ${value}%`}
+                  labelLine={false}
+                >
+                  {donationTypes.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
                 <Tooltip 
                   contentStyle={{ 
                     backgroundColor: 'rgba(255, 255, 255, 0.95)', 
@@ -537,52 +589,18 @@ const DonationsView = () => {
                     borderRadius: '12px', 
                     boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
                   }} 
-                  formatter={(value, name, props) => [
-                    `$${Number(value).toFixed(2)}`, 
-                    'Donation Amount',
-                    `Merchant: ${props.payload.name}`
-                  ]}
+                  formatter={(value) => [`${value}%`, 'Percentage']}
                 />
-                <Bar 
-                  dataKey="value" 
-                  fill="#8884d8"
-                  radius={[0, 8, 8, 0]} 
-                  minPointSize={3}
-                />
-                <ChartGradients />
-              </BarChart>
+              </PieChart>
             </ResponsiveContainer>
-          </div>
-        </ChartCard>
-
-        <ChartCard title="Direct vs Split Donations">
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={donationTypes}
-                cx="50%"
-                cy="50%"
-                outerRadius={120}
-                innerRadius={60}
-                dataKey="value"
-                label={({ name, value }) => `${name}: ${value}%`}
-                labelLine={false}
-              >
-                {donationTypes.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'rgba(255, 255, 255, 0.95)', 
-                  border: 'none', 
-                  borderRadius: '12px', 
-                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
-                }} 
-                formatter={(value) => [`${value}%`, 'Percentage']}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full text-gray-500" style={{ height: '300px' }}>
+              <div className="text-center">
+                <p className="text-lg mb-2">No Data Available</p>
+                <p className="text-sm">No donation type data found for the selected filters</p>
+              </div>
+            </div>
+          )}
         </ChartCard>
       </div>
 
@@ -591,79 +609,94 @@ const DonationsView = () => {
         {/* Donations Timeline */}
         <ChartCard title="Donations Timeline (Last 14 Days)">
           <div style={{ width: '100%', height: '300px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={timelineData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <XAxis 
-                  dataKey="date" 
-                  tick={{ fontSize: 10 }}
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)', 
-                    border: 'none', 
-                    borderRadius: '12px', 
-                    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
-                  }} 
-                  formatter={(value) => [`$${Number(value).toFixed(2)}`, 'Donations']}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="amount" 
-                  stroke="#8B5CF6" 
-                  strokeWidth={3}
-                  dot={{ fill: '#8B5CF6', strokeWidth: 2, r: 4 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {timelineData.length > 0 && timelineData.some(d => d.amount > 0) ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={timelineData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fontSize: 10 }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                      border: 'none', 
+                      borderRadius: '12px', 
+                      boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
+                    }} 
+                    formatter={(value) => [`${Number(value).toFixed(2)}`, 'Donations']}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="amount" 
+                    stroke="#8B5CF6" 
+                    strokeWidth={3}
+                    dot={{ fill: '#8B5CF6', strokeWidth: 2, r: 4 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                <div className="text-center">
+                  <p className="text-lg mb-2">No Data Available</p>
+                  <p className="text-sm">No donation timeline data found for the selected filters</p>
+                </div>
+              </div>
+            )}
           </div>
         </ChartCard>
+
 
         {/* Share of Donations by Location */}
         <ChartCard title="Top Merchants by Donation Count">
           <div style={{ width: '100%', height: '300px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={donationsByLocationCount.length > 0 ? donationsByLocationCount : [
-                { name: 'Singapore', value: 12500 },
-                { name: 'Malaysia', value: 8000 },
-                { name: 'Thailand', value: 4000 }
-              ]} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <XAxis 
-                  type="number" 
-                  tick={{ fontSize: 12 }} 
-                  domain={[0, (dataMax) => Math.ceil(dataMax)]}
-                  allowDecimals={false}
-                />
-                <YAxis 
-                  dataKey="name" 
-                  type="category" 
-                  width={120} 
-                  tick={{ fontSize: 10 }} 
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)', 
-                    border: 'none', 
-                    borderRadius: '12px', 
-                    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
-                  }} 
-                  formatter={(value) => [
-                    `${value}`,
-                    'Donation Count'
-                  ]}
-                />
-                <Bar 
-                  dataKey="value" 
-                  fill="#F59E0B"
-                  radius={[0, 8, 8, 0]}
-                  minPointSize={3}
-                />
-                <ChartGradients />
-              </BarChart>
-            </ResponsiveContainer>
+            {donationsByLocationCount.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={donationsByLocationCount} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <XAxis 
+                    type="number" 
+                    tick={{ fontSize: 12 }} 
+                    domain={[0, (dataMax) => Math.ceil(dataMax)]}
+                    allowDecimals={false}
+                  />
+                  <YAxis 
+                    dataKey="name" 
+                    type="category" 
+                    width={120} 
+                    tick={{ fontSize: 10 }} 
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                      border: 'none', 
+                      borderRadius: '12px', 
+                      boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' 
+                    }} 
+                    formatter={(value) => [
+                      `${value}`,
+                      'Donation Count'
+                    ]}
+                  />
+                  <Bar 
+                    dataKey="value" 
+                    fill="#F59E0B"
+                    radius={[0, 8, 8, 0]}
+                    minPointSize={3}
+                  />
+                  <ChartGradients />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                <div className="text-center">
+                  <p className="text-lg mb-2">No Data Available</p>
+                  <p className="text-sm">No merchant donation count data found for the selected filters</p>
+                </div>
+              </div>
+            )}
           </div>
         </ChartCard>
       </div>
